@@ -3,16 +3,38 @@ import isArray from "shared/isArray";
 import { createFiberFromElement, FiberNode, createFiberFromText } from "./ReactFiber";
 import { Placement } from "./ReactFiberFlags";
 import { HostText } from "./ReactWorkTags";
+import { createWorkInProgress } from "./ReactFiber";
+
+
 
 function createChildReconciler(shouldTrackSideEffects) {
+    function useFiber(fiber, pendingProps) {
+        const clone = createWorkInProgress(fiber, pendingProps);
+        clone.index = 0;
+        clone.sibling = null;
+        return clone;
+    }
     function reconcileSingleElement(returnFiber, currentFirstChild, element) {
+        const key = element.key;
+        let child = currentFirstChild;
+        while (child !== null) {
+            if (child.key === key) {
+                const elementType = element.type;
+                if (child.type === elementType) {
+                    const existing = useFiber(child, element.props);
+                    existing.return = returnFiber;
+                    return existing;
+                }
+            }
+            child = child.sibling;
+        }
         const created = createFiberFromElement(element);
         created.return = returnFiber;
         return created;
     }
     function placeSingleChild(newFiber) {
-        if (shouldTrackSideEffects) {
-            newFiber.flags |= Placement;  
+        if (shouldTrackSideEffects && newFiber.alternate === null) {
+            newFiber.flags |= Placement;
         }
         return newFiber;
     }

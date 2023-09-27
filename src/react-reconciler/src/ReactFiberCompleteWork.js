@@ -3,9 +3,10 @@ import {
     createInstance,
     createTextInstance,
     finalizeInitialChildren,
+    prepareUpdate,
 } from "react-dom-bindings/src/client/ReactDOMHostConfig";
-import { HostComponent, HostRoot, HostText } from "./ReactWorkTags";
-import { NoFlags } from "./ReactFiberFlags";
+import { HostComponent, HostRoot, HostText, FunctionComponent } from "./ReactWorkTags";
+import { NoFlags, Update } from "./ReactFiberFlags";
 import logger, { indent } from "shared/logger";
 function bubbleProperties(completedWork) {
     let subtreeFlags = NoFlags;
@@ -24,7 +25,7 @@ function appendAllChildren(parent, workInProgress) {
     while (node !== null) {
         // 如果是原生节点，直接添加到父节点上
         if (node.tag === HostComponent || node.tag === HostText) {
-        
+
             appendInitialChild(parent, node.stateNode);
             // 再看看第一个节节点是不是原生节点
         } else if (node.child !== null) {
@@ -47,13 +48,26 @@ function appendAllChildren(parent, workInProgress) {
         // 下一个弟弟节点
         node = node.sibling;
     }
-
-    
 }
 
+function markUpdate(workInProgress) {
+    workInProgress.flags |= Update;
+}
+function updateHostComponent(current, workInProgress, type, newProps) {
+    const oldProps = current.memoizedProps;
+    const instance = workInProgress.stateNode;
+    const updatePayload = prepareUpdate(instance, type, oldProps, newProps);
+    workInProgress.updateQueue = updatePayload;
+    if (updatePayload) {
+        markUpdate(workInProgress);
+    }
+}
+
+
+
 export function completeWork(current, workInProgress) {
-    // indent.number -= 4;
-    logger("".repeat(indent.number) + "endWork", workInProgress);
+    indent.number -= 4;
+    logger(" ".repeat(indent.number) + "endWork", workInProgress);
     const newProps = workInProgress.pendingProps;
 
     switch (workInProgress.tag) {
@@ -67,11 +81,11 @@ export function completeWork(current, workInProgress) {
             const { type } = workInProgress;
 
             if (current !== null && workInProgress.stateNode !== null) {
-
+                updateHostComponent(current, workInProgress, type, newProps);
+                console.log("updatePayload", workInProgress.updateQueue);
             } else {
-            
+
                 const instance = createInstance(type, newProps, workInProgress);
-            
                 appendAllChildren(instance, workInProgress);
                 workInProgress.stateNode = instance;
                 finalizeInitialChildren(instance, type, newProps);
@@ -82,7 +96,10 @@ export function completeWork(current, workInProgress) {
         case HostRoot:
             bubbleProperties(workInProgress);
             break;
-        
+        case FunctionComponent:
+            bubbleProperties(workInProgress);
+            break;
+
         default:
             break;
     }
