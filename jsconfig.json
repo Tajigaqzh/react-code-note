@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "react/*": [
+        "src/react/*"
+      ],
+      "react-dom/*": [
+        "src/react-dom/*"
+      ],
+      "react-dom-bindings/*": [
+        "src/react-dom-bindings/*"
+      ],
+      "react-dom/server/*": [
+        "src/react-dom/server/*"
+      ],
+      "react-reconciler/*": [
+        "src/react-reconciler/*"
+      ],
+      "scheduler/*": [
+        "src/scheduler/*"
+      ],
+      "shared/*": [
+        "src/shared/*"
+      ]
+    }
+  }
+}
