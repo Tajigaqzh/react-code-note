@@ -66,14 +66,14 @@ function updateHostComponent(current, workInProgress, type, newProps) {
 
 
 export function completeWork(current, workInProgress) {
-    indent.number -= 4;
-    logger(" ".repeat(indent.number) + "endWork", workInProgress);
+    // indent.number -= 4;
+    // logger(" ".repeat(indent.number) + "endWork", workInProgress);
     const newProps = workInProgress.pendingProps;
 
     switch (workInProgress.tag) {
         case HostText: {
-            const newText = newProps;
-            workInProgress.stateNode = createTextInstance(newText);
+            // const newText = newProps;
+            workInProgress.stateNode = createTextInstance(newProps);
             bubbleProperties(workInProgress);
             break;
         }

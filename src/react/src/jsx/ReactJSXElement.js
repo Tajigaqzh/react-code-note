@@ -1,5 +1,5 @@
 import hasOwnProperty from "shared/hasOwnProperty";
-import { REACT_ELEMENT_TYPE } from "shared/ReactSymbols";
+import {REACT_ELEMENT_TYPE} from "shared/ReactSymbols";
 
 const RESERVED_PROPS = {
     key: true,
@@ -12,14 +12,13 @@ function hasValidRef(config) {
 }
 
 const ReactElement = (type, key, ref, props) => {
-    const element = {
+    return {
         $$typeof: REACT_ELEMENT_TYPE,
         type,
         key,
         ref,
         props,
     };
-    return element;
 };
 
 export function jsxDEV(type, config, maybeKey) {
@@ -31,6 +30,7 @@ export function jsxDEV(type, config, maybeKey) {
     if (maybeKey !== undefined) {
         key = "" + maybeKey;
     }
+
 
     if (hasValidRef(config)) {
         ref = config.ref;

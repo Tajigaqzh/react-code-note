@@ -49,8 +49,8 @@ function updateFunctionComponent(current, workInProgress, Component, nextProps) 
     return workInProgress.child;
 }
 export function beginWork(current, workInProgress) {
-    logger(" ".repeat(indent.number) + "beginWork", workInProgress);
-    indent.number += 4;
+    // logger(" ".repeat(indent.number) + "beginWork", workInProgress);
+    // indent.number += 4;
     switch (workInProgress.tag) {
         case IndeterminateComponent: {
             return mountIndeterminateComponent(

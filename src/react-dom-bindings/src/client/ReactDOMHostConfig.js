@@ -9,6 +9,8 @@ export function shouldSetTextContent(type, props) {
 export const appendInitialChild = (parent, child) => {
     parent.appendChild(child);
 };
+
+
 export const createInstance = (type, props, internalInstanceHandle) => {
     const domElement = document.createElement(type);
     precacheFiberNode(internalInstanceHandle, domElement);
@@ -33,4 +35,8 @@ export function prepareUpdate(domElement, type, oldProps, newProps) {
 export function commitUpdate(domElement, updatePayload, type, oldProps, newProps) {
     updateProperties(domElement, updatePayload, type, oldProps, newProps);
     updateFiberProps(domElement, newProps);
+}
+
+export function removeChild(parentInstance, child) {
+    parentInstance.removeChild(child);
 }

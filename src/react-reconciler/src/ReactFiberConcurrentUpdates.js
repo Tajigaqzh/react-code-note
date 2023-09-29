@@ -1,4 +1,4 @@
-import { HostRoot } from "./ReactWorkTags";
+import {HostRoot} from "./ReactWorkTags";
 
 const concurrentQueues = [];
 let concurrentQueuesIndex = 0;
@@ -12,8 +12,7 @@ export function markUpdateLaneFromFiberToRoot(sourceFiber) {
         parent = parent.return;
     }
     if (node.tag === HostRoot) {
-        const root = node.stateNode;
-        return root;
+        return node.stateNode;
     }
     return null;
 }
@@ -23,9 +22,9 @@ export function enqueueConcurrentHookUpdate(fiber, queue, update) {
     return getRootForUpdatedFiber(fiber);
 }
 function enqueueUpdate(fiber, queue, update) {
-    concurrentQueues[concurrentQueuesIndex++] = fiber;
-    concurrentQueues[concurrentQueuesIndex++] = queue;
-    concurrentQueues[concurrentQueuesIndex++] = update;
+    concurrentQueues[concurrentQueuesIndex++] = fiber;//fiber
+    concurrentQueues[concurrentQueuesIndex++] = queue;//更新队列
+    concurrentQueues[concurrentQueuesIndex++] = update;//更新
 }
 function getRootForUpdatedFiber(sourceFiber) {
     let node = sourceFiber;

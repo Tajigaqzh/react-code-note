@@ -26,6 +26,8 @@ export function FiberNode(tag, pendingProps, key) {
     this.flags = NoFlags;
     this.subtreeFlags = NoFlags;
     this.alternate = null;
+    this.index = 0;
+    this.deletions = null;
 }
 function createFiber(tag, pendingProps, key) {
     return new FiberNode(tag, pendingProps, key);
