@@ -1,11 +1,12 @@
 import ReactSharedInternals from "shared/ReactSharedInternals";
-import { enqueueConcurrentHookUpdate } from "./ReactFiberConcurrentUpdates";
-import { scheduleUpdateOnFiber } from "./ReactFiberWorkLoop";
+import {enqueueConcurrentHookUpdate} from "./ReactFiberConcurrentUpdates";
+import {scheduleUpdateOnFiber} from "./ReactFiberWorkLoop";
 import objectIs from "shared/is.js";
-import { Passive as PassiveEffect } from "./ReactFiberFlags";
-import { HasEffect as HookHasEffect, Passive as HookPassive } from "./ReactHookEffectTags";
+import {Passive as PassiveEffect, Update as UpdateEffect} from "./ReactFiberFlags";
+import {HasEffect as HookHasEffect, Passive as HookPassive, Layout as HookLayout} from "./ReactHookEffectTags";
+import is from "shared/is.js";
 
-const { ReactCurrentDispatcher } = ReactSharedInternals;
+const {ReactCurrentDispatcher} = ReactSharedInternals;
 let currentlyRenderingFiber = null;
 let workInProgressHook = null;
 let currentHook = null;
@@ -17,6 +18,7 @@ const HooksDispatcherOnMountInDEV = {
     useReducer: mountReducer,
     useState: mountState,
     useEffect: mountEffect,
+    useLayoutEffect: mountLayoutEffect,
 };
 
 /**
@@ -26,11 +28,101 @@ const HooksDispatcherOnUpdateInDEV = {
     useReducer: updateReducer,
     useState: updateState,
     useEffect: updateEffect,
+    useLayoutEffect: updateLayoutEffect,
 };
 
+function mountEffect(create, deps) {
+    return mountEffectImpl(PassiveEffect, HookPassive, create, deps);
+}
+
+function mountLayoutEffect(create, deps) {
+    return mountEffectImpl(PassiveEffect, HookLayout, create, deps)
+}
+
+function updateLayoutEffect(create, deps) {
+    return updateEffectImpl(UpdateEffect, HookLayout, create, deps);
+}
+
+function mountEffectImpl(fiberFlags, hookFlags, create, deps) {
+    const hook = mountWorkInProgressHook();
+    const nextDeps = deps === undefined ? null : deps;
+    //给当前的函数组件fiber添加flags
+    currentlyRenderingFiber.flags |= fiberFlags;
+    hook.memoizedState = pushEffect(HookHasEffect | hookFlags, create, undefined, nextDeps);
+}
+
+function pushEffect(tag, create, destroy, deps) {
+    const effect = {
+        tag, create, destroy, deps, next: null
+    };
+    let componentUpdateQueue = currentlyRenderingFiber.updateQueue;
+    if (componentUpdateQueue === null) {
+        componentUpdateQueue = createFunctionComponentUpdateQueue();
+        currentlyRenderingFiber.updateQueue = componentUpdateQueue;
+        componentUpdateQueue.lastEffect = effect.next = effect;
+    } else {
+        const lastEffect = componentUpdateQueue.lastEffect;
+        if (lastEffect === null) {
+            componentUpdateQueue.lastEffect = effect.next = effect;
+        } else {
+            const firstEffect = lastEffect.next;
+            lastEffect.next = effect;
+            effect.next = firstEffect;
+            componentUpdateQueue.lastEffect = effect;
+        }
+    }
+    return effect;
+}
+
+function createFunctionComponentUpdateQueue() {
+    return {
+        lastEffect: null,
+    };
+}
+
 function updateEffect(create, deps) {
-    console.log('updateEffect', create, deps);
-    // return updateEffectImpl(PassiveEffect, HookPassive, create, deps);
+    return updateEffectImpl(PassiveEffect, HookPassive, create, deps);
+}
+
+function updateEffectImpl(fiberFlags, hookFlags, create, deps) {
+    const hook = updateWorkInProgressHook();
+    const nextDeps = deps === undefined ? null : deps;
+    let destroy;
+    if (currentHook !== null) {
+        const prevEffect = currentHook.memoizedState;
+        destroy = prevEffect.destroy;
+        if (nextDeps !== null) {
+            const prevDeps = prevEffect.deps;
+            //用新数组和老数组记性对比，如果一样的话
+            if (areHookInputsEqual(nextDeps, prevDeps)) {
+                //不管要不要重新执行，都要把新的effect组成完整的循环链表放到fiber.updateQueue
+                hook.memoizedState = pushEffect(hookFlags, create, destroy, nextDeps);
+                return;
+            }
+        }
+    }
+    currentlyRenderingFiber.flags |= fiberFlags;
+    hook.memoizedState = pushEffect(HookHasEffect | hookFlags, create, destroy, nextDeps);
+
+}
+
+/**
+ * 比较新老依赖数组是否相等
+ * @param nextDeps 新数组
+ * @param prevDeps 老数组
+ * @returns {boolean}
+ */
+function areHookInputsEqual(nextDeps, prevDeps) {
+    if (prevDeps === null) {
+        return false;
+    }
+    for (let i = 0; i < prevDeps.length && i < nextDeps.length; i++) {
+        if (is(nextDeps[i], prevDeps[i])) {
+            continue;
+        }
+        return false;
+    }
+    return true;
 }
 
 function mountWorkInProgressHook() {
@@ -174,6 +266,8 @@ function updateReducer(reducer) {
 
 export function renderWithHooks(current, workInProgress, Component, props) {
     currentlyRenderingFiber = workInProgress;
+    workInProgress.updateQueue = null;
+    workInProgress.memoizedState = null;
     if (current !== null && current.memoizedState !== null) {
         ReactCurrentDispatcher.current = HooksDispatcherOnUpdateInDEV;
     } else {

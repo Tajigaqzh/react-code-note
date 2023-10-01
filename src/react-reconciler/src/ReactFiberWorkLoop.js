@@ -1,13 +1,20 @@
-import { scheduleCallback } from "scheduler";
-import { createWorkInProgress } from "./ReactFiber";
-import { beginWork } from "./ReactFiberBeginWork";
-import { completeWork } from "./ReactFiberCompleteWork";
-import { MutationMask, NoFlags, Update, Placement, ChildDeletion } from "./ReactFiberFlags";
-import { commitMutationEffectsOnFiber } from "./ReactFiberCommitWork";
-import { finishQueueingConcurrentUpdates } from "./ReactFiberConcurrentUpdates";
-import { FunctionComponent, HostRoot, HostComponent, HostText } from "./ReactWorkTags";
+import {scheduleCallback} from "scheduler";
+import {createWorkInProgress} from "./ReactFiber";
+import {beginWork} from "./ReactFiberBeginWork";
+import {completeWork} from "./ReactFiberCompleteWork";
+import {ChildDeletion, MutationMask, NoFlags, Passive, Placement, Update} from "./ReactFiberFlags";
+import {
+    commitLayoutEffects,
+    commitMutationEffectsOnFiber,
+    commitPassiveMountEffects,
+    commitPassiveUnmountEffects
+} from "./ReactFiberCommitWork";
+import {finishQueueingConcurrentUpdates} from "./ReactFiberConcurrentUpdates";
+import {FunctionComponent, HostComponent, HostRoot, HostText} from "./ReactWorkTags";
 
 let workInProgress = null;//正在工作中的fiber
+let rootDoesHavePassiveEffects = false;
+let rootWithPendingPassiveEffects = null;
 
 /**
  * 调度，更新root，源码中此处有一个任务的功能
@@ -35,11 +42,17 @@ function performConcurrentWorkOnRoot(root) {
     // 第一次渲染都是同步
     renderRootSync(root);
     //开始进入提交阶段，执行副作用，修改真实dom
-    const finishedWork = root.current.alternate;
-    printFiber(finishedWork);
-    console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-    root.finishedWork = finishedWork;
+    // printFiber(finishedWork);
+    root.finishedWork = root.current.alternate;
     commitRoot(root);
+}
+
+export function flushPassiveEffects() {
+    if (rootWithPendingPassiveEffects !== null) {
+        const root = rootWithPendingPassiveEffects;
+        commitPassiveUnmountEffects(root.current);
+        commitPassiveMountEffects(root, root.current);
+    }
 }
 
 /**
@@ -47,13 +60,25 @@ function performConcurrentWorkOnRoot(root) {
  * @param root
  */
 function commitRoot(root) {
-    const { finishedWork } = root;
+    const {finishedWork} = root;
+    if ((finishedWork.subtreeFlags & Passive) !== NoFlags || (finishedWork.flags & Passive) !== NoFlags) {
+        if (!rootDoesHavePassiveEffects) {
+            rootDoesHavePassiveEffects = true;
+            scheduleCallback(flushPassiveEffects);
+        }
+    }
     const subtreeHasEffects =
         (finishedWork.subtreeFlags & MutationMask) !== NoFlags;
     const rootHasEffect = (finishedWork.flags & MutationMask) !== NoFlags;
     //如果自己有副作用，或者子节点有副作用，就执行副作用
     if (subtreeHasEffects || rootHasEffect) {
         commitMutationEffectsOnFiber(finishedWork, root);
+        commitLayoutEffects(finishedWork, root);
+        root.current = finishedWork;
+        if (rootDoesHavePassiveEffects) {
+            rootDoesHavePassiveEffects = false;
+            rootWithPendingPassiveEffects = root;
+        }
     }
     //dom变更后，指向新的fiber树
     root.current = finishedWork;
