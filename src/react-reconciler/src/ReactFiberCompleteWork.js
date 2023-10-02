@@ -5,22 +5,28 @@ import {
     finalizeInitialChildren,
     prepareUpdate,
 } from "react-dom-bindings/src/client/ReactDOMHostConfig";
-import { HostComponent, HostRoot, HostText, FunctionComponent } from "./ReactWorkTags";
-import { NoFlags, Update,Ref } from "./ReactFiberFlags";
-import logger, { indent } from "shared/logger";
+import {HostComponent, HostRoot, HostText, FunctionComponent, ContextProvider} from "./ReactWorkTags";
+import {NoFlags, Update, Ref} from "./ReactFiberFlags";
+import {NoLanes, mergeLanes} from './ReactFiberLane';
+
+import logger, {indent} from "shared/logger";
 
 function markRef(workInProgress) {
     workInProgress.flags |= Ref;
 }
+
 function bubbleProperties(completedWork) {
+    let newChildLanes = NoLanes;
     let subtreeFlags = NoFlags;
     let child = completedWork.child;
     while (child !== null) {
+        newChildLanes = mergeLanes(newChildLanes, mergeLanes(child.lanes, child.childLanes));
         subtreeFlags |= child.subtreeFlags;
         subtreeFlags |= child.flags;
         child = child.sibling;
     }
     completedWork.subtreeFlags |= subtreeFlags;
+    completedWork.childLanes = newChildLanes;
 }
 
 function appendAllChildren(parent, workInProgress) {
@@ -107,6 +113,9 @@ export function completeWork(current, workInProgress) {
             bubbleProperties(workInProgress);
             break;
         case FunctionComponent:
+            bubbleProperties(workInProgress);
+            break;
+        case ContextProvider:
             bubbleProperties(workInProgress);
             break;
 

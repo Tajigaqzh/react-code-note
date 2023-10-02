@@ -1,14 +1,17 @@
 import ReactSharedInternals from "shared/ReactSharedInternals";
 import {enqueueConcurrentHookUpdate} from "./ReactFiberConcurrentUpdates";
+import {requestEventTime, requestUpdateLane, scheduleUpdateOnFiber} from "./ReactFiberWorkLoop";
 import {Passive as PassiveEffect, Update as UpdateEffect} from "./ReactFiberFlags";
-import {HasEffect as HookHasEffect, Passive as HookPassive, Layout as HookLayout} from "./ReactHookEffectTags";
-import {scheduleUpdateOnFiber, requestUpdateLane} from "./ReactFiberWorkLoop";
+import {HasEffect as HookHasEffect, Layout as HookLayout, Passive as HookPassive} from "./ReactHookEffectTags";
 import is from "shared/is.js";
+import {isSubsetOfLanes, mergeLanes, NoLane, NoLanes} from './ReactFiberLane';
+import { readContext } from './ReactFiberNewContext';
 
 const {ReactCurrentDispatcher} = ReactSharedInternals;
 let currentlyRenderingFiber = null;
 let workInProgressHook = null;
 let currentHook = null;
+let renderLanes = NoLanes;
 
 /**
  * 挂载的时候用的不同的dispatcher
@@ -19,6 +22,7 @@ const HooksDispatcherOnMountInDEV = {
     useEffect: mountEffect,
     useLayoutEffect: mountLayoutEffect,
     useRef: mountRef,
+    useContext: readContext,
 };
 
 /**
@@ -30,6 +34,7 @@ const HooksDispatcherOnUpdateInDEV = {
     useEffect: updateEffect,
     useLayoutEffect: updateLayoutEffect,
     useRef: updateRef,
+    useContext: readContext
 };
 
 function mountRef(initialValue) {
@@ -145,6 +150,8 @@ function mountWorkInProgressHook() {
         memoizedState: null,
         queue: null,
         next: null,
+        baseState: null,
+        baseQueue: null,
     };
     if (workInProgressHook === null) {
         currentlyRenderingFiber.memoizedState = workInProgressHook = hook;
@@ -168,6 +175,8 @@ function mountReducer(reducer, initialArg) {
     hook.memoizedState = initialArg;
     const queue = {
         pending: null, dispatch: null,
+        lastRenderedReducer: reducer,
+        lastRenderedState: initialArg,
     };
     hook.queue = queue;
     const dispatch = (queue.dispatch = dispatchReducerAction.bind(null, currentlyRenderingFiber, queue));
@@ -175,29 +184,99 @@ function mountReducer(reducer, initialArg) {
 }
 
 function updateReducer(reducer) {
-    const hook = updateWorkInProgressHook()
-    const queue = hook.queue
-    queue.lastRenderedReducer = reducer
-    const current = currentHook
+    const hook = updateWorkInProgressHook();
+    const queue = hook.queue;
+    queue.lastRenderedReducer = reducer;
+    const current = currentHook;
+    let baseQueue = current.baseQueue;
     const pendingQueue = queue.pending
-    let newState = current.memoizedState
+
+    // let newState = current.memoizedState
     if (pendingQueue !== null) {
-        queue.pending = null
-        const first = pendingQueue.next
-        let update = first
-        do {
-            //小优化，如果计算过了直接使用计算得到的值，不用再计算了
-            if (update.hasEagerState) {
-                newState = update.eagerState
-            } else {
-                const action = update.action
-                newState = reducer(newState, action)
-            }
-            update = update.next
-        } while (update !== null && update !== first)
+        if (baseQueue !== null) {
+            const baseFirst = baseQueue.next;
+            baseQueue.next = pendingQueue.next;
+            pendingQueue.next = baseFirst;
+        }
+        current.baseQueue = baseQueue = pendingQueue;
+        queue.pending = null;
     }
-    hook.memoizedState = queue.lastRenderedState = newState
-    return [hook.memoizedState, queue.dispatch]
+    if (baseQueue !== null) {
+        const first = baseQueue.next;
+        let newState = current.baseQueue;
+        let newBaseState = null;
+        let newBaseQueueFirst = null;
+        let newBaseQueueLast = null;
+        let update = first;
+        do {
+            const updateLane = update.lane;
+            const shouldSkipUpdate = !isSubsetOfLanes(renderLanes, updateLane);
+            if (shouldSkipUpdate) {
+                const clone = {
+                    lane: updateLane,
+                    action: update.action,
+                    hasEagerState: update.hasEagerState,
+                    eagerState: update.eagerState,
+                    next: null,
+                }
+                if (newBaseQueueLast === null) {
+                    newBaseQueueFirst = newBaseQueueLast = clone
+                    newBaseState = newState
+                } else {
+                    newBaseQueueLast = newBaseQueueLast.next = clone
+                }
+                currentlyRenderingFiber.lanes = mergeLanes(currentlyRenderingFiber.lanes, updateLane);
+            } else {
+                if (newBaseQueueLast !== null) {
+                    const clone = {
+                        lane: NoLane,
+                        action: update.action,
+                        hasEagerState: update.hasEagerState,
+                        eagerState: update.eagerState,
+                        next: null,
+                    }
+                    newBaseQueueLast = newBaseQueueLast.next = clone
+                }
+                if (update.hasEagerState) {
+                    newState = update.eagerState
+                } else {
+                    const action = update.action
+                    newState = reducer(newState, action)
+                }
+            }
+            update = update.next;
+        } while (update !== null && update !== first)
+        if (newBaseQueueLast === null) {
+            newBaseState = newState
+        } else {
+            newBaseQueueLast.next = newBaseQueueFirst
+        }
+        hook.memoizedState = newState;
+        hook.baseState = newBaseState;
+        hook.baseQueue = newBaseQueueLast;
+        queue.lastRenderedState = newState;
+    }
+    if (pendingQueue === null) {
+        queue.lanes = NoLanes;
+    }
+    const dispatch = queue.dispatch;
+    return [hook.memoizedState, dispatch];
+    // // queue.pending = null
+    // // const first = pendingQueue.next
+    // // let update = first
+    // do {
+    //     //小优化，如果计算过了直接使用计算得到的值，不用再计算了
+    //     if (update.hasEagerState) {
+    //         newState = update.eagerState
+    //     } else {
+    //         const action = update.action
+    //         newState = reducer(newState, action)
+    //     }
+    //     update = update.next
+    // } while (update !== null && update !== first)
+    // }
+    // hook.memoizedState = queue.lastRenderedState = newState
+    // return [hook.memoizedState, queue.dispatch]
 }
 
 function mountState(initialState) {
@@ -245,7 +324,8 @@ function dispatchSetState(fiber, queue, action) {
     }
     //真正的入队更新，并调度逻辑
     const root = enqueueConcurrentHookUpdate(fiber, queue, update, lane);
-    scheduleUpdateOnFiber(root, fiber, lane)
+    const eventTime = requestEventTime();
+    scheduleUpdateOnFiber(root, fiber, lane, eventTime);
 }
 
 function updateWorkInProgressHook() {
@@ -258,7 +338,9 @@ function updateWorkInProgressHook() {
     const newHook = {
         memoizedState: currentHook.memoizedState,
         queue: currentHook.queue,
-        next: null
+        next: null,
+        baseState: currentHook.baseState,
+        baseQueue: currentHook.baseQueue,
     }
     if (workInProgressHook === null) {
         currentlyRenderingFiber.memoizedState = workInProgressHook = newHook
@@ -281,7 +363,8 @@ function basicStateReducer(state, action) {
 }
 
 
-export function renderWithHooks(current, workInProgress, Component, props) {
+export function renderWithHooks(current, workInProgress, Component, props, nextRenderLanes) {
+    renderLanes = nextRenderLanes;
     currentlyRenderingFiber = workInProgress;
     workInProgress.updateQueue = null;
     workInProgress.memoizedState = null;
@@ -294,5 +377,6 @@ export function renderWithHooks(current, workInProgress, Component, props) {
     currentlyRenderingFiber = null;
     workInProgressHook = null;
     currentHook = null;
+    renderLanes = NoLanes;
     return children;
 }

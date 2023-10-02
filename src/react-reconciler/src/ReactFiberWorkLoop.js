@@ -4,7 +4,9 @@ import {
     NormalPriority as NormalSchedulerPriority,
     scheduleCallback as Scheduler_scheduleCallback,
     UserBlockingPriority as UserBlockingSchedulerPriority,
-    cancelCallback as Scheduler_cancelCallback
+    cancelCallback as Scheduler_cancelCallback,
+    now,
+    shouldYield
 } from "./Scheduler";
 
 
@@ -24,9 +26,13 @@ import {
     getNextLanes,
     includesBlockingLane,
     markRootUpdated,
+    markStarvedLanesAsExpired,
+    includesExpiredLane,
     NoLane,
     NoLanes,
-    SyncLane
+    SyncLane,
+    NoTimestamp,
+    mergeLanes, markRootFinished
 } from './ReactFiberLane';
 import {
     ContinuousEventPriority,
@@ -47,6 +53,7 @@ let rootDoesHavePassiveEffects = false;
 let rootWithPendingPassiveEffects = null;
 let workInProgressRootRenderLanes = NoLanes;
 
+let currentEventTime = NoTimestamp;
 
 const RootInProgress = 0;
 const RootCompleted = 5;
@@ -54,28 +61,36 @@ let workInProgressRoot = null;
 let workInProgressRootExitStatus = RootInProgress;
 
 
+function cancelCallback(callbackNode) {
+    console.log('cancelCallback');
+    return Scheduler_cancelCallback(callbackNode);
+}
+
 /**
  * 调度，更新root，源码中此处有一个任务的功能
  * @param root root节点
  * @param fiber
  * @param lane
+ * @param eventTime
  */
-export function scheduleUpdateOnFiber(root, fiber, lane) {
+export function scheduleUpdateOnFiber(root, fiber, lane, eventTime) {
     markRootUpdated(root, lane);
     //确保调度执行root上的更新
-    ensureRootIsScheduled(root);
+    ensureRootIsScheduled(root, eventTime);
 }
 
 /**
  * 确保调度执行root上的更新
  * @param {*} root
+ * @param currentTime
  */
-function ensureRootIsScheduled(root) {
+function ensureRootIsScheduled(root, currentTime) {
 
     //告诉浏览器要执行此函数performConcurrentWorkOnRoot
     // scheduleCallback(performConcurrentWorkOnRoot.bind(null, root));
     // Scheduler_scheduleCallback(NormalSchedulerPriority, performConcurrentWorkOnRoot.bind(null, root));
     const existingCallbackNode = root.callbackNode;
+    markStarvedLanesAsExpired(root, currentTime);
     const nextLanes = getNextLanes(root, root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes);
 
 
@@ -148,8 +163,16 @@ function performConcurrentWorkOnRoot(root, didTimeout) {
     if (lanes === NoLanes) {
         return null;
     }
-    const shouldTimeSlice = !includesBlockingLane(root, lanes) && (!didTimeout);
+    const nonIncludesBlockingLane = !includesBlockingLane(root, lanes);
+    const nonIncludesExpiredLane = !includesExpiredLane(root, lanes);
+    const nonTimeout = !didTimeout;
+    const shouldTimeSlice = nonIncludesBlockingLane && nonIncludesExpiredLane && nonTimeout;
     const exitStatus = shouldTimeSlice ? renderRootConcurrent(root, lanes) : renderRootSync(root, lanes);
+
+    // const shouldTimeSlice = !includesBlockingLane(root, lanes) && (!didTimeout);
+    // const exitStatus = shouldTimeSlice ? renderRootConcurrent(root, lanes) : renderRootSync(root, lanes);
+
+
     if (exitStatus !== RootInProgress) {
         root.finishedWork = root.current.alternate;
         commitRoot(root);
@@ -186,8 +209,10 @@ function renderRootConcurrent(root, lanes) {
 
 function workLoopConcurrent() {
     // sleep(1000);
-    performUnitOfWork(workInProgress);
-    console.log('shouldYield()', shouldYield(), workInProgress?.type);
+    while (workInProgress !== null && !shouldYield()) {
+        performUnitOfWork(workInProgress);
+    }
+    // console.log('shouldYield()', shouldYield(), workInProgress?.type);
 }
 
 export function flushPassiveEffects() {
@@ -216,6 +241,8 @@ function commitRootImpl(root) {
     const {finishedWork} = root;
     root.callbackNode = null;
     root.callbackPriority = NoLane;
+    const remainingLanes = mergeLanes(finishedWork.lanes, finishedWork.childLanes);
+    markRootFinished(root, remainingLanes);
     workInProgressRoot = null;
     workInProgressRootRenderLanes = NoLanes;
 
@@ -241,6 +268,7 @@ function commitRootImpl(root) {
     }
     //dom变更后，指向新的fiber树
     root.current = finishedWork;
+    ensureRootIsScheduled(root, now());
 }
 
 /**
@@ -396,4 +424,20 @@ function getFlags(flags) {
         return `更新`;
     }
     return flags;
+}
+
+
+export function requestEventTime() {
+    currentEventTime = now();
+    return currentEventTime;
+}
+
+function sleep(time) {
+    const timeStamp = new Date().getTime();
+    const endTime = timeStamp + time;
+    while (true) {
+        if (new Date().getTime() > endTime) {
+            return;
+        }
+    }
 }

@@ -1,5 +1,6 @@
 import { createHostRootFiber } from "./ReactFiber";
 import { initializeUpdateQueue } from "./ReactFiberClassUpdateQueue";
+import { NoTimestamp, createLaneMap, NoLanes } from 'react-reconciler/src/ReactFiberLane';
 
 /**
  * 创建根fiberNode
@@ -8,6 +9,8 @@ import { initializeUpdateQueue } from "./ReactFiberClassUpdateQueue";
  */
 function FiberRootNode(containerInfo) {
     this.containerInfo = containerInfo;
+    this.expirationTimes =createLaneMap(NoTimestamp);
+    this.expiredLanes = NoLanes;
 }
 
 /**

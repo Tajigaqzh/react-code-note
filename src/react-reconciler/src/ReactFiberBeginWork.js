@@ -1,10 +1,19 @@
-import { HostRoot, HostComponent, HostText, IndeterminateComponent, FunctionComponent } from "./ReactWorkTags";
+import {
+    HostRoot,
+    HostComponent,
+    HostText,
+    IndeterminateComponent,
+    FunctionComponent,
+    ContextProvider
+} from "./ReactWorkTags";
 // import { processUpdateQueue } from "./ReactFiberClassUpdateQueue";
-import { mountChildFibers, reconcileChildFibers } from "./ReactChildFiber";
-import { shouldSetTextContent } from "react-dom-bindings/src/client/ReactDOMHostConfig";
-import logger, { indent } from "shared/logger";
+import {mountChildFibers, reconcileChildFibers} from "./ReactChildFiber";
+import {shouldSetTextContent} from "react-dom-bindings/src/client/ReactDOMHostConfig";
+import logger, {indent} from "shared/logger";
 import {renderWithHooks} from "./ReactFiberHooks";
 import {processUpdateQueue, cloneUpdateQueue} from "./ReactFiberClassUpdateQueue";
+import {NoLanes} from './ReactFiberLane';
+import {pushProvider} from './ReactFiberNewContext';
 
 
 function reconcileChildren(current, workInProgress, nextChildren) {
@@ -48,13 +57,14 @@ function mountIndeterminateComponent(_current, workInProgress, Component) {
     return workInProgress.child;
 }
 
-function updateFunctionComponent(current, workInProgress, Component, nextProps) {
-    const nextChildren = renderWithHooks(current, workInProgress, Component, nextProps);
+function updateFunctionComponent(current, workInProgress, Component, nextProps, renderLanes) {
+    const nextChildren = renderWithHooks(current, workInProgress, Component, nextProps, renderLanes);
     reconcileChildren(current, workInProgress, nextChildren);
     return workInProgress.child;
 }
 
 export function beginWork(current, workInProgress, renderLanes) {
+    workInProgress.lanes = NoLanes;
     // logger(" ".repeat(indent.number) + "beginWork", workInProgress);
     // indent.number += 4;
     switch (workInProgress.tag) {
@@ -77,7 +87,20 @@ export function beginWork(current, workInProgress, renderLanes) {
             return updateHostComponent(current, workInProgress, renderLanes);
         case HostText:
             return null;
+        case ContextProvider:
+            return updateContextProvider(current, workInProgress, renderLanes);
         default:
             return null;
     }
+}
+
+function updateContextProvider(current,workInProgress, renderLanes){
+    const providerType = workInProgress.type;
+    const context = providerType._context;
+    const newProps = workInProgress.pendingProps;
+    const newValue = newProps.value;
+    pushProvider(context,newValue);
+    const newChildren = newProps.children;
+    reconcileChildren(current,workInProgress,newChildren,renderLanes);
+    return workInProgress.child;
 }

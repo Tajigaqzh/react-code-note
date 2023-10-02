@@ -47,8 +47,14 @@ import UseLayoutEffectTest from "./test/12UseLayoutEffectTest";
 //更新渲染
 // import FunctionComponent  from "./test/14UpdateRender.jsx";
 
-import FunctionComponent  from "./test/16UseRef.jsx";
+//useRef
+// import FunctionComponent  from "./test/16UseRef.jsx";
 
+//饥饿问题
+// import FunctionComponent from "./test/17.Hungry.jsx";
+
+//useContext
+import UseContextTest from "./test/18UseContext.jsx";
 
 // let element = <Render />;
 // let element = <Event />;
@@ -64,8 +70,9 @@ import FunctionComponent  from "./test/16UseRef.jsx";
 // let element = <UseLayoutEffectTest/>
 
 // let element = <Scheduler/>
-let element = <FunctionComponent/>
+// let element = <FunctionComponent/>
 
+let element = <UseContextTest/>
 const root = createRoot(document.getElementById("root"));
 
 root.render(element);

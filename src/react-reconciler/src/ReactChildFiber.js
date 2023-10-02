@@ -6,7 +6,11 @@ import { HostText } from "./ReactWorkTags";
 import { createWorkInProgress } from "./ReactFiber";
 
 
-
+/**
+ * 创建子节点协调器，用于协调子节点，比如说删除、更新、插入等
+ * @param shouldTrackSideEffects 是否跟踪副作用
+ * @returns {(function(*, *, *): (*|null))|*}
+ */
 function createChildReconciler(shouldTrackSideEffects) {
     function useFiber(fiber, pendingProps) {
         const clone = createWorkInProgress(fiber, pendingProps);
@@ -16,23 +20,33 @@ function createChildReconciler(shouldTrackSideEffects) {
     }
 
     /**
-     * 删除老儿子
-     * @param returnFiber 老fiber
+     * 删除儿子节点
+     * @param returnFiber 父亲节点
      * @param childToDelete 将要删除的儿子
      */
     function deleteChild(returnFiber, childToDelete) {
+        //不跟踪副作用，直接返回
         if (!shouldTrackSideEffects) {
             return;
         }
+        //删除的节点的flags
         const deletions = returnFiber.deletions;
         if (deletions === null) {
+
             returnFiber.deletions = [childToDelete];
             returnFiber.flags |= ChildDeletion;
         } else {
             deletions.push(childToDelete);
         }
     }
-    //删除从currentFirstChild之后所有的弟弟fiber节点
+
+    /**
+     * 借助deleteChild实现
+     * 删除从currentFirstChild之后所有的弟弟fiber节点
+     * @param returnFiber 父fiber
+     * @param currentFirstChild 当前的第一个儿子fiber
+     * @returns {null}
+     */
     function deleteRemainingChildren(returnFiber, currentFirstChild) {
         if (!shouldTrackSideEffects) {
             return null;

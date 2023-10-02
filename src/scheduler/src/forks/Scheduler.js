@@ -1,10 +1,7 @@
-import {peek, pop, push} from './SchedulerMinHeap';
+import { push, peek, pop } from './SchedulerMinHeap';
 import {
-    IdlePriority,
-    ImmediatePriority,
-    LowPriority,
-    NormalPriority,
-    UserBlockingPriority
+    ImmediatePriority, UserBlockingPriority, NormalPriority, LowPriority,
+    IdlePriority
 } from './SchedulerPriorities';
 
 function getCurrentTime() {
@@ -32,7 +29,7 @@ let currentTask = null;
 //React每一帧向浏览申请5毫秒用于自己任务执行
 //如果5MS内没有完成，React也会放弃控制权，把控制交还给浏览器
 const frameInterval = 5;
-//messageChannel
+
 const channel = new MessageChannel();
 const port2 = channel.port2;
 const port1 = channel.port1;
@@ -45,8 +42,9 @@ port1.onmessage = performWorkUntilDeadline;
  */
 function scheduleCallback(priorityLevel, callback) {
     // 获取当前的时候
+    const currentTime = getCurrentTime();
     // 此任务的开时间
-    const startTime = getCurrentTime();
+    const startTime = currentTime;
     //超时时间
     let timeout;
     //根据优先级计算过期的时间
@@ -93,7 +91,6 @@ function shouldYieldToHost() {
     }//否则就是表示5毫秒用完了，需要放弃执行
     return true;
 }
-
 function workLoop(startTime) {
     let currentTime = startTime;
     //取出优先级最高的任务 局长
@@ -177,12 +174,3 @@ export {
     unstable_cancelCallback,
     getCurrentTime as now
 }
-
-/**
- * 任务调度器，用来调度任务,处理优先队列
- * @param callback 回调函数
- */
-/*
-export function scheduleCallback(callback) {
-    requestIdleCallback(callback);
-}*/

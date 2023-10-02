@@ -34,12 +34,28 @@ export function useEffect(create, deps) {
     return dispatcher.useEffect(create, deps);
 }
 
+/**
+ * useLayoutEffect
+ * @param create
+ * @param deps
+ * @returns {void|*}
+ */
 export function useLayoutEffect(create, deps) {
     const dispatcher = resolveDispatcher();
     return dispatcher.useLayoutEffect(create, deps);
 }
 
+/**
+ * useRef
+ * @param initialValue
+ * @returns {{current: *}|*}
+ */
 export function useRef(initialValue) {
     const dispatcher = resolveDispatcher();
     return dispatcher.useRef(initialValue);
+}
+
+export function useContext(Context){
+    const dispatcher = resolveDispatcher();
+    return dispatcher.useContext(Context);
 }

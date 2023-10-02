@@ -1,12 +1,7 @@
-
-import {
-    HostRoot,
-    IndeterminateComponent,
-    HostComponent,
-    HostText,
-} from "./ReactWorkTags";
-import { NoFlags } from "./ReactFiberFlags";
-
+import {ContextProvider, HostComponent, HostRoot, HostText, IndeterminateComponent} from "./ReactWorkTags";
+import {NoFlags} from "./ReactFiberFlags";
+import {NoLanes} from './ReactFiberLane';
+import {REACT_PROVIDER_TYPE} from 'shared/ReactSymbols';
 
 export function FiberNode(tag, pendingProps, key) {
     this.tag = tag;
@@ -29,6 +24,8 @@ export function FiberNode(tag, pendingProps, key) {
     this.index = 0;
     this.deletions = null;
     this.ref = null;
+    this.lanes = NoLanes;
+    this.childLanes = NoLanes;
 }
 function createFiber(tag, pendingProps, key) {
     return new FiberNode(tag, pendingProps, key);
@@ -50,6 +47,7 @@ export function createWorkInProgress(current, pendingProps) {
         workInProgress.type = current.type;
         workInProgress.flags = NoFlags;
         workInProgress.subtreeFlags = NoFlags;
+        workInProgress.deletions = null;
     }
     workInProgress.child = current.child;
     workInProgress.memoizedProps = current.memoizedProps;
@@ -58,6 +56,9 @@ export function createWorkInProgress(current, pendingProps) {
     workInProgress.sibling = current.sibling;
     workInProgress.index = current.index;
     workInProgress.ref = current.ref;
+    workInProgress.flags = current.flags;
+    workInProgress.childLanes = current.childLanes;
+    workInProgress.lanes = current.lanes;
     return workInProgress;
 }
 
@@ -65,6 +66,20 @@ export function createFiberFromTypeAndProps(type, key, pendingProps) {
     let fiberTag = IndeterminateComponent;
     if (typeof type === "string") {
         fiberTag = HostComponent;
+    } else {
+        getTag:switch (type) {
+            default: {
+                if (typeof type === "object" && type !== null) {
+                    switch (type.$$typeof) {
+                        case REACT_PROVIDER_TYPE:
+                            fiberTag = ContextProvider;
+                            break getTag;
+                        default:
+                            break getTag;
+                    }
+                }
+            }
+        }
     }
     const fiber = createFiber(fiberTag, pendingProps, key);
     fiber.type = type;
@@ -72,11 +87,9 @@ export function createFiberFromTypeAndProps(type, key, pendingProps) {
 }
 export function createFiberFromElement(element) {
     const { type, key, props: pendingProps } = element;
-    const fiber = createFiberFromTypeAndProps(type, key, pendingProps);
-    return fiber;
+    return createFiberFromTypeAndProps(type, key, pendingProps);
 }
 
 export function createFiberFromText(content) {
-    const fiber = createFiber(HostText, content, null);
-    return fiber;
+    return createFiber(HostText, content, null);
 }
