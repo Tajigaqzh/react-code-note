@@ -1,26 +1,22 @@
 import * as React from 'react';
 
-export default function UseEffectTest() {
 
+export default function UseEffectTest() {
     const [number, setNumber] = React.useState(0);
     React.useEffect(() => {
         console.log('useEffect');
-        return () => {
-            console.log('useEffect return');
-        }
     },[]);
-
 
     React.useLayoutEffect(() => {
         console.log('useLayoutEffect2');
-        return () => {
-            console.log('destroy useLayoutEffect2');
+        return ()=>{
+            console.log('useLayoutEffect2 return');
         }
     })
 
     React.useEffect(() => {
         console.log('useEffect3');
-        return () => {
+        return ()=>{
             console.log('useEffect3 return');
         }
     })

@@ -125,6 +125,7 @@ function createChildReconciler(shouldTrackSideEffects) {
                     //类型一样，也要删除多余的老的子fiber
                     deleteRemainingChildren(returnFiber, child.sibling);
                     const existing = useFiber(child, element.props);
+                    existing.ref = element.ref;
                     existing.return = returnFiber;
                     return existing;
                 } else {
@@ -139,6 +140,7 @@ function createChildReconciler(shouldTrackSideEffects) {
             child = child.sibling;
         }
         const created = createFiberFromElement(element);
+        created.ref = element.ref;
         created.return = returnFiber;
         return created;
     }
@@ -164,6 +166,7 @@ function createChildReconciler(shouldTrackSideEffects) {
             switch (newChild.$$typeof) {
                 case REACT_ELEMENT_TYPE: {
                     const created = createFiberFromElement(newChild);
+                    created.ref = newChild.ref;
                     created.return = returnFiber;
                     return created;
                 }
@@ -210,12 +213,14 @@ function createChildReconciler(shouldTrackSideEffects) {
         if (current !== null) {
             if (current.type === elementType) {
                 const existing = useFiber(current, element.props);
+                existing.ref = element.ref;
                 existing.return = returnFiber;
                 return existing;
             }
         }
         const created = createFiberFromElement(element);
         created.return = returnFiber;
+        created.ref = element.ref;
         return created;
     }
 

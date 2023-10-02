@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import * as React from "react";
 
+
 //渲染
 import Render from "./test/01Render";
 
@@ -39,6 +40,16 @@ import UseEffectTest from "./test/11UseEffectTest";
 
 //useLayoutEffect
 import UseLayoutEffectTest from "./test/12UseLayoutEffectTest";
+
+//任务调度
+// import Scheduler from "./test/13Scheduler";
+
+//更新渲染
+// import FunctionComponent  from "./test/14UpdateRender.jsx";
+
+import FunctionComponent  from "./test/16UseRef.jsx";
+
+
 // let element = <Render />;
 // let element = <Event />;
 // let element = <UseReducer />;
@@ -50,7 +61,11 @@ import UseLayoutEffectTest from "./test/12UseLayoutEffectTest";
 // let element = <MoreDiffPart/>
 // let element = <MoreDiff/>
 // let element = <UseEffectTest/>
-let element = <UseLayoutEffectTest/>
+// let element = <UseLayoutEffectTest/>
+
+// let element = <Scheduler/>
+let element = <FunctionComponent/>
+
 const root = createRoot(document.getElementById("root"));
 
 root.render(element);

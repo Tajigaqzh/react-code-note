@@ -1,14 +1,10 @@
 import {HostRoot, HostComponent, HostText, FunctionComponent} from "./ReactWorkTags";
-import {MutationMask, Placement, Update, Passive, LayoutMask} from "./ReactFiberFlags";
+import {MutationMask, Placement, Update, Passive, LayoutMask, Ref} from "./ReactFiberFlags";
 import {insertBefore, appendChild, commitUpdate, removeChild} from "react-dom-bindings/src/client/ReactDOMHostConfig";
 import {HasEffect as HookHasEffect, Passive as HookPassive, Layout as HookLayout} from "./ReactHookEffectTags";
 
 // 真实的父亲节点
 let hostParent = null;
-
-export function commitMutationEffects(finishedWork, root) {
-    commitMutationEffectsOnFiber(finishedWork, root);
-}
 
 export function commitPassiveUnmountEffects(finishedWork) {
     commitPassiveUnmountOnFiber(finishedWork);
@@ -19,7 +15,7 @@ function commitPassiveUnmountOnFiber(finishedWork) {
         case FunctionComponent: {
             recursivelyTraversePassiveUnmountEffects(finishedWork);
             if (finishedWork.flags & Passive) {
-                commitHookPassiveUnmountEffects(finishedWork, finishedWork.return, HookPassive | HookHasEffect);
+                commitHookPassiveUnmountEffects(finishedWork, HookHasEffect | HookPassive);
             }
             break;
         }
@@ -30,8 +26,8 @@ function commitPassiveUnmountOnFiber(finishedWork) {
     }
 }
 
-function commitHookPassiveUnmountEffects(finishedWork, nearestMountedAncestor, hookFlags) {
-    commitHookEffectListUnmount(hookFlags, finishedWork, nearestMountedAncestor);
+function commitHookPassiveUnmountEffects(finishedWork, hookFlags) {
+    commitHookEffectListUnmount(hookFlags, finishedWork);
 }
 
 function commitHookEffectListUnmount(flags, finishedWork) {
@@ -80,6 +76,11 @@ function commitHookPassiveMountEffects(finishedWork, hookFlags) {
     commitHookEffectListMount(hookFlags, finishedWork);
 }
 
+/**
+ * mount时提交更新副作用
+ * @param flags
+ * @param finishedWork
+ */
 function commitHookEffectListMount(flags, finishedWork) {
     const updateQueue = finishedWork.updateQueue;
     const lastEffect = updateQueue !== null ? updateQueue.lastEffect : null;
@@ -344,12 +345,15 @@ export function commitMutationEffectsOnFiber(finishedWork, root) {
             recursivelyTraverseMutationEffects(root, finishedWork);
             commitReconciliationEffects(finishedWork);
             if (flags & Update) {
-                commitHookEffectListUnmount(HookLayout | HookHasEffect, finishedWork, finishedWork.return);
+                commitHookEffectListUnmount(HookLayout | HookHasEffect, finishedWork);
             }
             break;
         case HostComponent: {
             recursivelyTraverseMutationEffects(root, finishedWork);
             commitReconciliationEffects(finishedWork);
+            if (flags & Ref) {
+                commitAttachRef(finishedWork);
+            }
             if (flags & Update) {
                 const instance = finishedWork.stateNode;
                 if (instance != null) {
@@ -376,6 +380,23 @@ export function commitMutationEffectsOnFiber(finishedWork, root) {
     }
 }
 
+/**
+ * 提交layout effect
+ * @param finishedWork
+ * @param hookFlags
+ */
 function commitHookLayoutEffects(finishedWork, hookFlags) {
     commitHookEffectListMount(hookFlags, finishedWork);
+}
+
+function commitAttachRef(finishedWork) {
+    const ref = finishedWork.ref;
+    if (ref !== null) {
+        const instance = finishedWork.stateNode;
+        if (typeof ref === "function") {
+            ref(instance)
+        } else {
+            ref.current = instance;
+        }
+    }
 }

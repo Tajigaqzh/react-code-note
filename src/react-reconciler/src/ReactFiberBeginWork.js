@@ -1,9 +1,10 @@
 import { HostRoot, HostComponent, HostText, IndeterminateComponent, FunctionComponent } from "./ReactWorkTags";
-import { processUpdateQueue } from "./ReactFiberClassUpdateQueue";
+// import { processUpdateQueue } from "./ReactFiberClassUpdateQueue";
 import { mountChildFibers, reconcileChildFibers } from "./ReactChildFiber";
 import { shouldSetTextContent } from "react-dom-bindings/src/client/ReactDOMHostConfig";
 import logger, { indent } from "shared/logger";
-import { renderWithHooks } from "./ReactFiberHooks";
+import {renderWithHooks} from "./ReactFiberHooks";
+import {processUpdateQueue, cloneUpdateQueue} from "./ReactFiberClassUpdateQueue";
 
 
 function reconcileChildren(current, workInProgress, nextChildren) {
@@ -13,16 +14,20 @@ function reconcileChildren(current, workInProgress, nextChildren) {
         workInProgress.child = reconcileChildFibers(workInProgress, current.child, nextChildren);
     }
 }
-function updateHostRoot(current, workInProgress) {
-    processUpdateQueue(workInProgress);
+
+function updateHostRoot(current, workInProgress, renderLanes) {
+    const nextProps = workInProgress.pendingProps;
+    cloneUpdateQueue(current, workInProgress);
+    processUpdateQueue(workInProgress, nextProps, renderLanes)
     const nextState = workInProgress.memoizedState;
     const nextChildren = nextState.element;
 
     reconcileChildren(current, workInProgress, nextChildren);
     return workInProgress.child;
 }
+
 function updateHostComponent(current, workInProgress) {
-    const { type } = workInProgress;
+    const {type} = workInProgress;
     const nextProps = workInProgress.pendingProps;
 
     let nextChildren = nextProps.children;
@@ -48,7 +53,8 @@ function updateFunctionComponent(current, workInProgress, Component, nextProps) 
     reconcileChildren(current, workInProgress, nextChildren);
     return workInProgress.child;
 }
-export function beginWork(current, workInProgress) {
+
+export function beginWork(current, workInProgress, renderLanes) {
     // logger(" ".repeat(indent.number) + "beginWork", workInProgress);
     // indent.number += 4;
     switch (workInProgress.tag) {
@@ -56,18 +62,19 @@ export function beginWork(current, workInProgress) {
             return mountIndeterminateComponent(
                 current,
                 workInProgress,
-                workInProgress.type
+                workInProgress.type,
+                renderLanes
             );
         }
         case FunctionComponent: {
             const Component = workInProgress.type;
             const resolvedProps = workInProgress.pendingProps;
-            return updateFunctionComponent(current, workInProgress, Component, resolvedProps);
+            return updateFunctionComponent(current, workInProgress, Component, resolvedProps, renderLanes);
         }
         case HostRoot:
-            return updateHostRoot(current, workInProgress);
+            return updateHostRoot(current, workInProgress, renderLanes);
         case HostComponent:
-            return updateHostComponent(current, workInProgress);
+            return updateHostComponent(current, workInProgress, renderLanes);
         case HostText:
             return null;
         default:

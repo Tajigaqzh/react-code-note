@@ -106,3 +106,14 @@ newChildren 和 oldFiber 都同时遍历完成，diff 结束
 newChildren 和 oldFiber 都没有完成，则进行节点移动的逻辑
 第 3 轮遍历
 处理节点移动的情况
+
+
+
+
+
+
+
+
+
+## 优先级队列算法，最小堆
+
